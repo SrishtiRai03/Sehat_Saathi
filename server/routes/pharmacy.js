@@ -1,8 +1,16 @@
+/**
+ * @fileoverview Pharmacy management API routes.
+ * Manages prescription queues, inventory tracking, dispensing workflow,
+ * and pharmacy analytics.
+ * @module routes/pharmacy
+ */
+
 import { Router } from 'express';
 import db from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
 
 router.get('/dashboard/:pharmacyId', (req, res) => {
   const pid = parseInt(req.params.pharmacyId);

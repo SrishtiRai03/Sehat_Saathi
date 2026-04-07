@@ -1,8 +1,31 @@
+/**
+ * @fileoverview Triage API routes.
+ * Implements 3-stage symptom assessment with weighted scoring algorithm.
+ * Stage 1: Emergency screening (critical yes/no questions)
+ * Stage 2: Severity assessment (pain scale, symptom type, progression)
+ * Stage 3: Context & history (travel, medications, demographics)
+ * @module routes/triage
+ */
+
 import { Router } from 'express';
 import db from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/utils.js';
 
 const router = Router();
+
+/** @constant {number} TOTAL_STAGES - Number of triage stages */
+const TOTAL_STAGES = 3;
+
+/** @constant {number} MAX_SCORE - Maximum severity score */
+const MAX_SCORE = 10;
+
+/** @constant {Object} SEVERITY_MAP - Score-to-severity mapping thresholds */
+const SEVERITY_MAP = {
+  CRITICAL: 8,
+  URGENT: 5,
+  MODERATE: 3,
+};
 
 const triageQuestions = {
   1: [
@@ -73,43 +96,152 @@ router.post('/submit', authMiddleware, (req, res) => {
   }
 });
 
-function calcScore(a, patientId) {
-  let s = 0;
-  if (a.q2_1 !== undefined) s += (parseInt(a.q2_1)/10)*10*0.25;
-  const dur = {hours:2,'1-2days':4,'3-7days':6,over_week:8};
-  if (a.q2_2 && dur[a.q2_2]) s += (dur[a.q2_2]/10)*10*0.15;
-  const prog = {improving:1,stable:4,worsening:7,rapid:10};
-  if (a.q2_3 && prog[a.q2_3]) s += (prog[a.q2_3]/10)*10*0.20;
-  const sym = {fever:4,cough:3,stomach:5,headache:4,skin:3,body_pain:3,weakness:5,other:4};
-  if (a.q2_4 && sym[a.q2_4]) s += (sym[a.q2_4]/10)*10*0.15;
-  if (Array.isArray(a.q2_5)) { const ss={nausea:2,fever:3,dizziness:3,swelling:2,breathing:4,none:0}; let mx=0; a.q2_5.forEach(v=>{mx=Math.max(mx,ss[v]||0);}); s+=(mx/4)*10*0.15; }
-  if (Array.isArray(a.q2_6)) { if(a.q2_6.includes('diabetes'))s+=0.5; if(a.q2_6.includes('heart'))s+=1; if(a.q2_6.includes('pregnant'))s*=1.2; }
-  if (a.q2_3==='rapid') s+=1;
-  if (a.q3_1==='contact'||a.q3_1==='both') s+=0.5;
-  if (a.q3_4==='emergency') s+=2;
-  if (a.q3_5==='child') s+=1.5; if (a.q3_5==='senior') s+=1;
-  return Math.min(10, Math.max(0, s));
-}
+/**
+ * Calculates a severity score (0-10) based on triage answers.
+ * Uses weighted scoring across multiple symptom dimensions:
+ * - Pain level (25%), Duration (15%), Progression (20%)
+ * - Primary symptom (15%), Accompanying symptoms (15%)
+ * - Pre-existing conditions & demographics (bonus modifiers)
+ *
+ * @param {Object} answers - Merged answers from all stages
+ * @param {number} patientId - Patient ID for risk factor lookup
+ * @returns {number} Severity score clamped to [0, 10]
+ */
+function calcScore(answers, patientId) {
+  let score = 0;
 
-function addToQueue(patientId, doctorId, sessionId, score, severity, io) {
-  db.delete('queue_entries', e => e.patient_id === patientId && e.status === 'waiting');
-  const queue = db.findAll('queue_entries', e => e.doctor_id === doctorId && e.status === 'waiting').sort((a,b) => b.score - a.score);
-  let position = 1;
-  for (const e of queue) { if (score > e.score) break; position++; }
-  const ew = Math.max(5, position * 8);
-  db.insert('queue_entries', { patient_id: patientId, doctor_id: doctorId, triage_session_id: sessionId, position, score, severity, status: 'waiting', estimated_wait: ew });
-  recalc(doctorId);
-  if (io) {
-    const q = db.findAll('queue_entries', e => e.doctor_id === doctorId && e.status === 'waiting').sort((a,b) => b.score - a.score);
-    q.forEach((e,i) => { const p = db.findOne('patients', p => p.patient_id === e.patient_id); e.patient_name = p?.name; e.abha_id = p?.abha_id; });
-    io.to(`queue-${doctorId}`).emit('queue-updated', q);
+  // Pain level (0-10 scale, weight 25%)
+  if (answers.q2_1 !== undefined) {
+    score += (parseInt(answers.q2_1) / MAX_SCORE) * MAX_SCORE * 0.25;
   }
-  return { position, estimated_wait: ew };
+
+  // Duration scoring (weight 15%)
+  const durationScores = { hours: 2, '1-2days': 4, '3-7days': 6, over_week: 8 };
+  if (answers.q2_2 && durationScores[answers.q2_2]) {
+    score += (durationScores[answers.q2_2] / MAX_SCORE) * MAX_SCORE * 0.15;
+  }
+
+  // Progression scoring (weight 20%)
+  const progressionScores = { improving: 1, stable: 4, worsening: 7, rapid: 10 };
+  if (answers.q2_3 && progressionScores[answers.q2_3]) {
+    score += (progressionScores[answers.q2_3] / MAX_SCORE) * MAX_SCORE * 0.20;
+  }
+
+  // Primary symptom scoring (weight 15%)
+  const symptomScores = { fever: 4, cough: 3, stomach: 5, headache: 4, skin: 3, body_pain: 3, weakness: 5, other: 4 };
+  if (answers.q2_4 && symptomScores[answers.q2_4]) {
+    score += (symptomScores[answers.q2_4] / MAX_SCORE) * MAX_SCORE * 0.15;
+  }
+
+  // Accompanying symptoms (weight 15%, takes max severity)
+  if (Array.isArray(answers.q2_5)) {
+    const accompanyingScores = { nausea: 2, fever: 3, dizziness: 3, swelling: 2, breathing: 4, none: 0 };
+    let maxAccompanying = 0;
+    answers.q2_5.forEach((v) => { maxAccompanying = Math.max(maxAccompanying, accompanyingScores[v] || 0); });
+    score += (maxAccompanying / 4) * MAX_SCORE * 0.15;
+  }
+
+  // Pre-existing conditions (bonus modifiers)
+  if (Array.isArray(answers.q2_6)) {
+    if (answers.q2_6.includes('diabetes')) score += 0.5;
+    if (answers.q2_6.includes('heart')) score += 1;
+    if (answers.q2_6.includes('pregnant')) score *= 1.2;
+  }
+
+  // Context modifiers (Stage 3)
+  if (answers.q2_3 === 'rapid') score += 1;
+  if (answers.q3_1 === 'contact' || answers.q3_1 === 'both') score += 0.5;
+  if (answers.q3_4 === 'emergency') score += 2;
+  if (answers.q3_5 === 'child') score += 1.5;
+  if (answers.q3_5 === 'senior') score += 1;
+
+  return Math.min(MAX_SCORE, Math.max(0, score));
 }
 
-function recalc(doctorId) {
-  const entries = db.findAll('queue_entries', e => e.doctor_id === doctorId && e.status === 'waiting').sort((a,b) => b.score - a.score || new Date(a.created_at) - new Date(b.created_at));
-  entries.forEach((e, i) => db.update('queue_entries', x => x.entry_id === e.entry_id, { position: i+1, estimated_wait: Math.max(5, (i+1)*8) }));
+/**
+ * Converts a numeric score to a severity label.
+ * @param {number} score - Severity score (0-10)
+ * @returns {string} Severity label: CRITICAL | URGENT | MODERATE | ROUTINE
+ */
+function getSeverity(score) {
+  if (score >= SEVERITY_MAP.CRITICAL) return 'CRITICAL';
+  if (score >= SEVERITY_MAP.URGENT) return 'URGENT';
+  if (score >= SEVERITY_MAP.MODERATE) return 'MODERATE';
+  return 'ROUTINE';
+}
+
+/**
+ * Adds a patient to the doctor's priority queue.
+ * Removes any existing waiting entry for the same patient to prevent duplicates.
+ * Emits real-time queue update via Socket.IO.
+ *
+ * @param {number} patientId - Patient ID
+ * @param {number} doctorId - Assigned doctor ID
+ * @param {number} sessionId - Triage session ID
+ * @param {number} score - Severity score
+ * @param {string} severity - Severity label
+ * @param {import('socket.io').Server} io - Socket.IO server instance
+ * @returns {{ position: number, estimated_wait: number }} Queue position and ETA
+ */
+function addToQueue(patientId, doctorId, sessionId, score, severity, io) {
+  // Remove existing entry to prevent duplicate queue positions
+  db.delete('queue_entries', (e) => e.patient_id === patientId && e.status === 'waiting');
+
+  const queue = db.findAll('queue_entries', (e) => e.doctor_id === doctorId && e.status === 'waiting')
+    .sort((a, b) => b.score - a.score);
+
+  // Find insertion position based on score (higher score = higher priority)
+  let position = 1;
+  for (const entry of queue) {
+    if (score > entry.score) break;
+    position++;
+  }
+
+  const estimatedWait = Math.max(5, position * 8);
+  db.insert('queue_entries', {
+    patient_id: patientId,
+    doctor_id: doctorId,
+    triage_session_id: sessionId,
+    position,
+    score,
+    severity,
+    status: 'waiting',
+    estimated_wait: estimatedWait,
+  });
+
+  recalcPositions(doctorId);
+
+  // Emit real-time update to connected clients
+  if (io) {
+    const updatedQueue = db.findAll('queue_entries', (e) => e.doctor_id === doctorId && e.status === 'waiting')
+      .sort((a, b) => b.score - a.score);
+    updatedQueue.forEach((e) => {
+      const patient = db.findOne('patients', (p) => p.patient_id === e.patient_id);
+      e.patient_name = patient?.name;
+      e.abha_id = patient?.abha_id;
+    });
+    io.to(`queue-${doctorId}`).emit('queue-updated', updatedQueue);
+  }
+
+  return { position, estimated_wait: estimatedWait };
+}
+
+/**
+ * Recalculates queue positions and estimated wait times after any queue change.
+ * Sorts by severity score (descending) with FIFO tiebreaker.
+ *
+ * @param {number} doctorId - Doctor ID whose queue to recalculate
+ */
+function recalcPositions(doctorId) {
+  const entries = db.findAll('queue_entries', (e) => e.doctor_id === doctorId && e.status === 'waiting')
+    .sort((a, b) => b.score - a.score || new Date(a.created_at) - new Date(b.created_at));
+
+  entries.forEach((entry, index) => {
+    db.update('queue_entries', (x) => x.entry_id === entry.entry_id, {
+      position: index + 1,
+      estimated_wait: Math.max(5, (index + 1) * 8),
+    });
+  });
 }
 
 export default router;

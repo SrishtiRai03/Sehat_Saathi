@@ -1,8 +1,16 @@
+/**
+ * @fileoverview Queue management API routes.
+ * Handles severity-based priority queue with real-time WebSocket updates.
+ * Supports doctor queue view, patient position tracking, call-next, and reprioritisation.
+ * @module routes/queue
+ */
+
 import { Router } from 'express';
 import db from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
 
 router.get('/doctor/:doctorId', (req, res) => {
   const did = parseInt(req.params.doctorId);

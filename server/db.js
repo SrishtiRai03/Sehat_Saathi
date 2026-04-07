@@ -1,19 +1,46 @@
-// In-memory data store that mimics SQLite operations
-// Using plain JS for zero-dependency reliability
+/**
+ * @fileoverview In-memory data store for Sehat Saathi.
+ * Provides a lightweight, SQLite-compatible API for CRUD operations.
+ * Designed for demo/prototyping — replace with a persistent database in production.
+ * @module db
+ */
 
+/**
+ * In-memory data store that mimics SQLite operations.
+ * Uses plain JavaScript arrays and objects for zero-dependency reliability.
+ *
+ * @class DataStore
+ * @example
+ * const db = new DataStore();
+ * db.createTable('users');
+ * db.insert('users', { name: 'John', role: 'patient' });
+ * const user = db.findOne('users', (u) => u.name === 'John');
+ */
 class DataStore {
   constructor() {
+    /** @type {Object.<string, Array>} Tables indexed by name */
     this.tables = {};
+    /** @type {Object.<string, number>} Auto-increment counters per table */
     this.autoIncrements = {};
   }
 
-  createTable(name, schema) {
+  /**
+   * Creates a new table if it does not already exist.
+   * @param {string} name - Table name
+   */
+  createTable(name) {
     if (!this.tables[name]) {
       this.tables[name] = [];
       this.autoIncrements[name] = 1;
     }
   }
 
+  /**
+   * Inserts a record into the specified table with auto-generated primary key.
+   * @param {string} table - Table name
+   * @param {Object} record - Data to insert
+   * @returns {{ lastInsertRowid: number }} Insert result with generated ID
+   */
   insert(table, record) {
     const pk = this._getPk(table);
     record[pk] = this.autoIncrements[table]++;
@@ -22,18 +49,38 @@ class DataStore {
     return { lastInsertRowid: record[pk] };
   }
 
+  /**
+   * Finds all records matching an optional filter.
+   * Returns deep copies to prevent mutation of internal state.
+   * @param {string} table - Table name
+   * @param {Function|null} [filter=null] - Predicate function
+   * @returns {Array<Object>} Matching records
+   */
   findAll(table, filter = null) {
     let rows = this.tables[table] || [];
     if (filter) rows = rows.filter(filter);
-    return rows.map(r => ({ ...r }));
+    return rows.map((r) => ({ ...r }));
   }
 
+  /**
+   * Finds the first record matching the filter.
+   * @param {string} table - Table name
+   * @param {Function} filter - Predicate function
+   * @returns {Object|null} Matching record or null
+   */
   findOne(table, filter) {
     const rows = this.tables[table] || [];
     const found = rows.find(filter);
     return found ? { ...found } : null;
   }
 
+  /**
+   * Updates records matching the filter with the given values.
+   * @param {string} table - Table name
+   * @param {Function} filter - Predicate function
+   * @param {Object} updates - Key-value pairs to update
+   * @returns {{ changes: number }} Number of records updated
+   */
   update(table, filter, updates) {
     const rows = this.tables[table] || [];
     let count = 0;
@@ -46,22 +93,48 @@ class DataStore {
     return { changes: count };
   }
 
+  /**
+   * Deletes records matching the filter.
+   * @param {string} table - Table name
+   * @param {Function} filter - Predicate function
+   * @returns {{ changes: number }} Number of records deleted
+   */
   delete(table, filter) {
     const before = (this.tables[table] || []).length;
-    this.tables[table] = (this.tables[table] || []).filter(r => !filter(r));
+    this.tables[table] = (this.tables[table] || []).filter((r) => !filter(r));
     return { changes: before - this.tables[table].length };
   }
 
+  /**
+   * Counts records matching an optional filter.
+   * @param {string} table - Table name
+   * @param {Function|null} [filter=null] - Predicate function
+   * @returns {number} Record count
+   */
   count(table, filter = null) {
     return this.findAll(table, filter).length;
   }
 
+  /**
+   * Returns the primary key column name for a given table.
+   * @param {string} table - Table name
+   * @returns {string} Primary key column name
+   * @private
+   */
   _getPk(table) {
     const pks = {
-      villages: 'village_id', patients: 'patient_id', doctors: 'doctor_id',
-      pharmacies: 'pharmacy_id', health_records: 'record_id', triage_sessions: 'session_id',
-      queue_entries: 'entry_id', consultations: 'consult_id', prescriptions: 'rx_id',
-      pharmacy_inventory: 'item_id', heatmap_data: 'point_id', appointments: 'appointment_id',
+      villages: 'village_id',
+      patients: 'patient_id',
+      doctors: 'doctor_id',
+      pharmacies: 'pharmacy_id',
+      health_records: 'record_id',
+      triage_sessions: 'session_id',
+      queue_entries: 'entry_id',
+      consultations: 'consult_id',
+      prescriptions: 'rx_id',
+      pharmacy_inventory: 'item_id',
+      heatmap_data: 'point_id',
+      appointments: 'appointment_id',
       users: 'user_id',
     };
     return pks[table] || 'id';

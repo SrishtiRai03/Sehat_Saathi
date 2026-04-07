@@ -2,13 +2,21 @@
   "name": "sehat-saathi",
   "private": true,
   "version": "1.0.0",
+  "description": "AI-Powered Smart Healthcare Management Platform for Rural India — Multilingual triage, real-time queue management, pharmacy analytics, and village-level disease surveillance.",
   "type": "module",
+  "author": "Team Sehat Saathi",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "client": "vite",
     "server": "nodemon server/index.js",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint src/ --ext .js,.jsx --report-unused-disable-directives",
+    "start": "node server/index.js"
   },
   "dependencies": {
     "react": "^18.2.0",

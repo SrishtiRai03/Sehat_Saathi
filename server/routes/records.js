@@ -1,8 +1,17 @@
+/**
+ * @fileoverview Health records API routes.
+ * Provides ABHA-linked digital health records including vitals, allergies,
+ * chronic conditions, medications, vaccinations, and lab results.
+ * Also generates AI-powered wellness recommendations.
+ * @module routes/records
+ */
+
 import { Router } from 'express';
 import db from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
 
 router.get('/:abhaId', (req, res) => {
   const patient = db.findOne('patients', p => p.abha_id === req.params.abhaId);

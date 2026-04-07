@@ -1,8 +1,16 @@
+/**
+ * @fileoverview Consultation API routes.
+ * Handles doctor-patient consultations including diagnosis submission,
+ * prescription creation, and consultation history.
+ * @module routes/consultation
+ */
+
 import { Router } from 'express';
 import db from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
 
 router.post('/start', authMiddleware, (req, res) => {
   const { patientId, doctorId, queueEntryId } = req.body;
