@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, API_BASE } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { motion } from 'framer-motion';
 import { Stethoscope, ClipboardList, FileText, Calendar, AlertTriangle, MapPin, LogOut, Activity, Sparkles, ChevronRight, Mic } from 'lucide-react';
@@ -16,8 +16,8 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     if (user?.refId) {
-      fetch(`/api/queue/patient/${user.refId}`).then(r=>r.json()).then(setQueueStatus).catch(()=>{});
-      fetch('/api/stats').then(r=>r.json()).then(setStats).catch(()=>{});
+      fetch(`${API_BASE}/api/queue/patient/${user.refId}`).then(r=>r.json()).then(setQueueStatus).catch(()=>{});
+      fetch(`${API_BASE}/api/stats`).then(r=>r.json()).then(setStats).catch(()=>{});
     }
   }, [user]);
 
@@ -48,7 +48,7 @@ export default function PatientDashboard() {
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <LanguageSelector />
-            <button onClick={() => { logout(); navigate('/'); }} style={{ width:'40px', height:'40px', borderRadius:'12px', background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <button onClick={() => { navigate('/'); setTimeout(logout, 100); }} style={{ width:'40px', height:'40px', borderRadius:'12px', background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <LogOut size={18} color="white" />
             </button>
           </div>

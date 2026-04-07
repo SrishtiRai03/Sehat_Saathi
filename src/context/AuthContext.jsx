@@ -2,6 +2,14 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 const AuthContext = createContext(null);
 
+/**
+ * Dynamic API base URL:
+ * - In dev (Vite proxy active): use '' so fetch('/api/...') goes through the proxy
+ * - In production (Express serves both API + static): use '' (same origin)
+ * - If you ever host frontend and backend separately, set VITE_API_BASE in .env
+ */
+const API_BASE = import.meta.env.VITE_API_BASE || '';
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('ss_token'));
@@ -9,7 +17,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (token) {
-      fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      fetch(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => { setUser(data); setLoading(false); })
         .catch(() => { localStorage.removeItem('ss_token'); setToken(null); setUser(null); setLoading(false); });
@@ -21,12 +29,12 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (role, phone, otp) => {
     let res;
     if (role && !phone) {
-      res = await fetch('/api/auth/demo-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
+      res = await fetch(`${API_BASE}/api/auth/demo-login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
     } else {
       if (otp) {
-        res = await fetch('/api/auth/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, otp }) });
+        res = await fetch(`${API_BASE}/api/auth/verify-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, otp }) });
       } else {
-        res = await fetch('/api/auth/send-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
+        res = await fetch(`${API_BASE}/api/auth/send-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
         return res.json();
       }
     }
@@ -39,16 +47,21 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  /**
+   * Logout — only clears auth state. Does NOT navigate.
+   * Each dashboard should call navigate('/') FIRST, then call logout()
+   * to avoid the race condition with ProtectedRoute guards.
+   */
   const logout = useCallback(() => {
     localStorage.removeItem('ss_token');
     setToken(null);
     setUser(null);
-    window.location.href = '/';
   }, []);
 
   const authFetch = useCallback(async (url, options = {}) => {
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
     const headers = { ...options.headers, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(fullUrl, { ...options, headers });
     if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
     return res.json();
   }, [token, logout]);
@@ -60,4 +73,5 @@ export function AuthProvider({ children }) {
   );
 }
 
+export { API_BASE };
 export const useAuth = () => useContext(AuthContext);

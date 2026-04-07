@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, API_BASE } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Heart, Droplets, Thermometer, Activity, Shield, Syringe, FlaskConical, Pill, Sparkles } from 'lucide-react';
@@ -16,7 +16,7 @@ export default function HealthRecords() {
 
   useEffect(() => {
     if (user?.refId) {
-      fetch(`/api/records/patient/${user.refId}`).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+      fetch(`${API_BASE}/api/records/patient/${user.refId}`).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
     }
   }, [user]);
 

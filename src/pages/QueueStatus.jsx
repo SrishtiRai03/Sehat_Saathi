@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, API_BASE } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Clock, Users, RefreshCw } from 'lucide-react';
 
@@ -12,7 +12,7 @@ export default function QueueStatus() {
 
   const fetchStatus = () => {
     if (!user?.refId) return;
-    fetch(`/api/queue/patient/${user.refId}`).then(r => r.json()).then(d => { setStatus(d); setLoading(false); }).catch(() => setLoading(false));
+    fetch(`${API_BASE}/api/queue/patient/${user.refId}`).then(r => r.json()).then(d => { setStatus(d); setLoading(false); }).catch(() => setLoading(false));
   };
 
   useEffect(() => { fetchStatus(); const i = setInterval(fetchStatus, 10000); return () => clearInterval(i); }, [user]);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, API_BASE } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -29,10 +29,10 @@ export default function DoctorDashboard() {
   const doctorId = user?.refId || 1;
 
   const fetchQueue = useCallback(() => {
-    fetch(`/api/queue/doctor/${doctorId}`).then(r => r.json()).then(d => {
+    fetch(`${API_BASE}/api/queue/doctor/${doctorId}`).then(r => r.json()).then(d => {
       setQueue(d.entries || []);
     }).catch(() => {});
-    fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {});
+    fetch(`${API_BASE}/api/stats`).then(r => r.json()).then(setStats).catch(() => {});
   }, [doctorId]);
 
   useEffect(() => { fetchQueue(); const i = setInterval(fetchQueue, 15000); return () => clearInterval(i); }, [fetchQueue]);
@@ -97,7 +97,7 @@ export default function DoctorDashboard() {
             <p style={{ font:'var(--text-body-sm)', color:'rgba(255,255,255,0.8)' }}>Doctor Dashboard 🩺</p>
             <h1 style={{ font:'var(--text-h2)', color:'white' }}>{user?.profile?.name || 'Dr. Anil Verma'}</h1>
           </div>
-          <button onClick={() => { logout(); window.location.href = '/'; }} style={{ width:'40px',height:'40px',borderRadius:'12px',background:'rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center' }}>
+          <button onClick={() => { window.location.href = '/'; setTimeout(logout, 100); }} style={{ width:'40px',height:'40px',borderRadius:'12px',background:'rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center' }}>
             <LogOut size={18} color="white" />
           </button>
         </div>

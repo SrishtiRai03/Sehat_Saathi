@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, API_BASE } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Calendar, Clock, User, CheckCircle, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
@@ -40,7 +40,7 @@ export default function BookAppointment() {
   useEffect(() => {
     if (!selectedDate) return;
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(selectedDate).padStart(2,'0')}`;
-    fetch(`/api/appointments/slots/${doctorId}?date=${dateStr}`).then(r => r.json()).then(d => { setSlots(d); setSelectedSlot(null); }).catch(() => {});
+    fetch(`${API_BASE}/api/appointments/slots/${doctorId}?date=${dateStr}`).then(r => r.json()).then(d => { setSlots(d); setSelectedSlot(null); }).catch(() => {});
   }, [selectedDate, year, month]);
 
   const handleBook = async () => {

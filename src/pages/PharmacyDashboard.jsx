@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, API_BASE } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -22,11 +22,11 @@ export default function PharmacyDashboard() {
   const pharmacyId = 1;
 
   const fetchData = useCallback(() => {
-    fetch(`/api/pharmacy/dashboard/${pharmacyId}`).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+    fetch(`${API_BASE}/api/pharmacy/dashboard/${pharmacyId}`).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
   }, [pharmacyId]);
 
   const fetchForecast = () => {
-    fetch(`/api/pharmacy/forecast/${pharmacyId}`).then(r => r.json()).then(setForecast).catch(() => {});
+    fetch(`${API_BASE}/api/pharmacy/forecast/${pharmacyId}`).then(r => r.json()).then(setForecast).catch(() => {});
   };
 
   useEffect(() => { fetchData(); fetchForecast(); const i = setInterval(fetchData, 20000); return () => clearInterval(i); }, [fetchData]);
@@ -63,7 +63,7 @@ export default function PharmacyDashboard() {
             <p style={{ font:'var(--text-body-sm)', color:'rgba(255,255,255,0.8)' }}>Pharmacy Dashboard 💊</p>
             <h1 style={{ font:'var(--text-h2)', color:'white' }}>Jan Aushadhi Kendra</h1>
           </div>
-          <button onClick={() => { logout(); window.location.href = '/'; }} style={{ width:'40px',height:'40px',borderRadius:'12px',background:'rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center' }}>
+          <button onClick={() => { window.location.href = '/'; setTimeout(logout, 100); }} style={{ width:'40px',height:'40px',borderRadius:'12px',background:'rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center' }}>
             <LogOut size={18} color="white" />
           </button>
         </div>

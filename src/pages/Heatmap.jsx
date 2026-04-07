@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, API_BASE } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, AlertTriangle, MapPin, Activity, Filter, Bell, ChevronDown, X } from 'lucide-react';
@@ -147,8 +147,8 @@ export default function Heatmap() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/heatmap/data').then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
-    fetch('/api/heatmap/alerts').then(r => r.json()).then(setAlerts).catch(() => {});
+    fetch(`${API_BASE}/api/heatmap/data`).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+    fetch(`${API_BASE}/api/heatmap/alerts`).then(r => r.json()).then(setAlerts).catch(() => {});
   }, []);
 
   const filteredVillages = useMemo(() => {
